@@ -1,4 +1,4 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, Browsers } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const qrcode = require('qrcode-terminal');
 const pino = require('pino');
@@ -20,11 +20,14 @@ function extractPhoneNumber(jid) {
 
 async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
+    const { version, isLatest } = await fetchLatestBaileysVersion();
+    console.log(`Using WA v${version.join('.')}, isLatest: ${isLatest}`);
 
     const sock = makeWASocket({
+        version,
         auth: state,
         logger: pino({ level: 'silent' }), // Keeping it silent to avoid console spam
-        browser: ['Ubuntu', 'Chrome', '20.0.04'] // Fixes the 405 Connection Failure on VPS
+        browser: Browsers.macOS('Desktop') // Standard macOS desktop browser signature
     });
 
     sock.ev.on('creds.update', saveCreds);
