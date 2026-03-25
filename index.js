@@ -108,14 +108,17 @@ async function connectToWhatsApp() {
                         const phoneNumber = extractPhoneNumber(senderJid);
                         console.log(`Route trigger from: ${phoneNumber}`);
                         const reporter = await db.getRouteReporter(phoneNumber);
-                        if (!reporter) {
-                            await sock.sendMessage(senderJid, { text: 'Sorry, you are not authorised to submit route reports.' });
-                            sessionManager.clearSession(senderJid);
-                        } else {
+
+                        // TEMPORARILy DISABLED FOR TESTING
+                        // if (!reporter) {
+                        //     await sock.sendMessage(senderJid, { text: 'Sorry, you are not authorised to submit route reports.' });
+                        //     sessionManager.clearSession(senderJid);
+                        // } else {
                             sessionManager.initRouteSession(senderJid);
                             await sock.sendMessage(senderJid, { text: 'Enter your driver ID' });
                             sessionManager.updateSession(senderJid, { currentStep: 'ROUTE_AWAIT_DRIVER_ID' });
-                        }
+                        // }
+
                     } else if (textLower === 'edit') {
                         // Start Edit flow
                         sessionManager.updateSession(senderJid, {
