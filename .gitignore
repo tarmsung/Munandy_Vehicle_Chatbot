@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# WhatsApp Auth State (SENSITIVE)
+auth_info_baileys/
+
+# Environment Variables (SENSITIVE)
+.env
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS Files
+.DS_Store
+Thumbs.db
