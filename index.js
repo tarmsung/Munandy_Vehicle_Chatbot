@@ -22,9 +22,9 @@ async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
     const sock = makeWASocket({
-        printQRInTerminal: true,
         auth: state,
-        logger: pino({ level: 'silent' }) // Keeping it silent to avoid console spam
+        logger: pino({ level: 'silent' }), // Keeping it silent to avoid console spam
+        browser: ['Ubuntu', 'Chrome', '20.0.04'] // Fixes the 405 Connection Failure on VPS
     });
 
     sock.ev.on('creds.update', saveCreds);
