@@ -57,7 +57,7 @@ async function lookupDriverAndVehicle(driverId, vehicleReg) {
  * Save the completed inspection report to the inspection_reports table.
  * Returns the new record's id.
  */
-async function saveInspectionReport({ driverId, vehicleReg, checklist, comments }) {
+async function saveInspectionReport({ driverId, vehicleReg, checklist, comments, reporterJid }) {
     try {
         const { data, error } = await supabase
             .from('inspection_reports')
@@ -66,7 +66,8 @@ async function saveInspectionReport({ driverId, vehicleReg, checklist, comments 
                 vehicle_registration: vehicleReg,
                 submitted_at:         new Date().toISOString(),
                 checklist:            checklist,  // stored as JSONB
-                comments:             comments || ''
+                comments:             comments || '',
+                reporter_jid:         reporterJid
             }])
             .select('id')
             .single();
@@ -165,14 +166,15 @@ async function getAllActiveVehicles() {
 /**
  * Save a completed route report to route_reports table.
  */
-async function saveRouteReport(driverId, vehicleRoutes) {
+async function saveRouteReport(driverId, vehicleRoutes, reporterJid) {
     try {
         const { data, error } = await supabase
             .from('route_reports')
             .insert([{
                 driver_id:      driverId,
                 submitted_at:   new Date().toISOString(),
-                vehicle_routes: vehicleRoutes
+                vehicle_routes: vehicleRoutes,
+                reporter_jid:   reporterJid
             }])
             .select('id')
             .single();
@@ -189,6 +191,74 @@ async function saveRouteReport(driverId, vehicleRoutes) {
     }
 }
 
+/**
+ * Fetch recent reports of a specific type for a specific JID.
+ */
+async function getRecentUserReports(jid, type, limit = 5) {
+    const table = type === 'van' ? 'inspection_reports' : 'route_reports';
+    try {
+        const { data, error } = await supabase
+            .from(table)
+            .select('*')
+            .eq('reporter_jid', jid)
+            .order('submitted_at', { ascending: false })
+            .limit(limit);
+
+        if (error) throw error;
+        return data || [];
+    } catch (err) {
+        console.error(`Error fetching recent ${type} reports:`, err);
+        throw err;
+    }
+}
+
+/**
+ * Fetch a single report by ID.
+ */
+async function getReportById(id, type) {
+    const table = type === 'van' ? 'inspection_reports' : 'route_reports';
+    try {
+        const { data, error } = await supabase
+            .from(table)
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) return null;
+        return data;
+    } catch (err) {
+        console.error(`Error fetching ${type} report ${id}:`, err);
+        throw err;
+    }
+}
+
+/**
+ * Update an existing report with new data and mark as edited.
+ */
+async function updateReport(id, type, updateData) {
+    const table = type === 'van' ? 'inspection_reports' : 'route_reports';
+    try {
+        const payload = {
+            ...updateData,
+            is_edited: true,
+            edited_at: new Date().toISOString()
+        };
+
+        const { data, error } = await supabase
+            .from(table)
+            .update(payload)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    } catch (err) {
+        console.error(`Error updating ${type} report ${id}:`, err);
+        throw err;
+    }
+}
+
 module.exports = {
     supabase,
     lookupDriverAndVehicle,
@@ -198,5 +268,9 @@ module.exports = {
     getDriverById,
     getAllRoutes,
     getAllActiveVehicles,
-    saveRouteReport
+    saveRouteReport,
+    // Edit flow helpers
+    getRecentUserReports,
+    getReportById,
+    updateReport
 };

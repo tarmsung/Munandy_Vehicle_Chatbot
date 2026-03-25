@@ -287,13 +287,28 @@ async function sendBriefing(sock, jid) {
  */
 async function finalizeRouteReport(sock, jid, session) {
     try {
-        await db.saveRouteReport(session.driverID, session.vehicleRoutes);
+        if (session.isEditing) {
+            // UPDATE existing report
+            await db.updateReport(session.editingReportId, 'route', {
+                vehicle_routes: session.vehicleRoutes
+            });
+            console.log(`Route report ${session.editingReportId} UPDATED by driver ${session.driverID}`);
+        } else {
+            // INSERT new report
+            await db.saveRouteReport(session.driverID, session.vehicleRoutes, jid);
+            console.log(`Route report submitted by driver ${session.driverID}`);
+        }
+
         await sendRouteReportToGroup(sock, {
             driverName:    session.driverName,
-            vehicleRoutes: session.vehicleRoutes
+            vehicleRoutes: session.vehicleRoutes,
+            isEdited:      session.isEditing
         });
-        await sock.sendMessage(jid, { text: 'Report submitted successfully ✅' });
-        console.log(`Route report submitted by driver ${session.driverID}`);
+
+        const successMsg = session.isEditing 
+            ? 'Report updated successfully ✅' 
+            : 'Report submitted successfully ✅';
+        await sock.sendMessage(jid, { text: successMsg });
     } catch (err) {
         console.error('Error finalizing route report:', err);
         await sock.sendMessage(jid, {

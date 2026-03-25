@@ -5,10 +5,10 @@ const nodeHtmlToImage = require('node-html-to-image');
  * Builds the HTML template for the Route Report.
  */
 function buildRouteReportHTML(sessionData) {
-    const { driverName, vehicleRoutes } = sessionData;
+    const { driverName, vehicleRoutes, isEdited } = sessionData;
     const dateStr = new Date().toLocaleString('en-US', { timeZoneName: 'short' });
 
-    let vehicleCardsHtml = '';
+    const editBanner = isEdited ? `<div class="edit-banner">⚠️ CORRECTED REPORT</div>` : '';
     
     vehicleRoutes.forEach(entry => {
         const { make, nickname, registration, branch, routes, reported_distance_km } = entry;
@@ -70,6 +70,17 @@ function buildRouteReportHTML(sessionData) {
             font-size: 2.5em;
             text-transform: uppercase;
             letter-spacing: 1px;
+          }
+          .edit-banner {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 1.2em;
           }
           .meta-info {
             display: flex;
@@ -160,6 +171,7 @@ function buildRouteReportHTML(sessionData) {
       </head>
       <body>
         <div class="report-container">
+          ${editBanner}
           <div class="header">
             <h1>Route Report</h1>
           </div>

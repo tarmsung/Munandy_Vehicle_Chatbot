@@ -70,12 +70,24 @@ async function connectToWhatsApp() {
         const session = sessionManager.getSession(senderJid);
 
         // ── ROUTE FLOW delegation ─────────────────────────────────────────
-        // If the session belongs to the route flow, hand off entirely.
         if (session.flow === 'route') {
             try {
                 await handleRouteMessage(sock, senderJid, text, session);
             } catch (err) {
                 console.error('Error in route flow:', err);
+                await sock.sendMessage(senderJid, { text: 'An internal error occurred. Please try again.' });
+                sessionManager.clearSession(senderJid);
+            }
+            return;
+        }
+
+        // ── EDIT FLOW delegation ─────────────────────────────────────────
+        if (session.flow === 'edit') {
+            try {
+                const { handleEditMessage } = require('./editFlow');
+                await handleEditMessage(sock, senderJid, text, session);
+            } catch (err) {
+                console.error('Error in edit flow:', err);
                 await sock.sendMessage(senderJid, { text: 'An internal error occurred. Please try again.' });
                 sessionManager.clearSession(senderJid);
             }
@@ -104,6 +116,13 @@ async function connectToWhatsApp() {
                             await sock.sendMessage(senderJid, { text: 'Enter your driver ID' });
                             sessionManager.updateSession(senderJid, { currentStep: 'ROUTE_AWAIT_DRIVER_ID' });
                         }
+                    } else if (textLower === 'edit') {
+                        // Start Edit flow
+                        sessionManager.updateSession(senderJid, {
+                            flow: 'edit',
+                            currentStep: 'EDIT_SELECT_TYPE'
+                        });
+                        await sock.sendMessage(senderJid, { text: "Which type of report would you like to edit?\n1. Van Inspection\n2. Route Report\n\nReply with the number or *cancel*." });
                     }
                     break;
 
@@ -209,23 +228,30 @@ async function connectToWhatsApp() {
                     const finalSession = sessionManager.getSession(senderJid);
                     
                     try {
-                        // 1. Save to DB
-                        const reportData = {
-                            driverId: finalSession.driverID,
-                            vehicleReg: finalSession.vehicleReg,
-                            checklist: finalSession.checklistResults,
-                            comments: finalSession.comments
-                        };
-                        await db.saveInspectionReport(reportData);
-                        
-                        // 2. Notify Group
-                        await reportHelper.sendReportToGroup(sock, finalSession);
-                        
-                        // 3. Inform Driver
-                        await sock.sendMessage(senderJid, { text: "Report submitted successfully. Have a safe trip! 🚗" });
-                        
+                        if (finalSession.isEditing) {
+                            // UPDATE
+                            await db.updateReport(finalSession.editingReportId, 'van', {
+                                checklist: finalSession.checklistResults,
+                                comments:  finalSession.comments
+                            });
+                            // Regenerate image with Edited label
+                            await reportHelper.sendReportToGroup(sock, { ...finalSession, isEdited: true });
+                            await sock.sendMessage(senderJid, { text: "Report updated successfully. ✅" });
+                        } else {
+                            // INSERT
+                            const reportData = {
+                                driverId:     finalSession.driverID,
+                                vehicleReg:   finalSession.vehicleReg,
+                                checklist:    finalSession.checklistResults,
+                                comments:     finalSession.comments,
+                                reporterJid:  senderJid
+                            };
+                            await db.saveInspectionReport(reportData);
+                            await reportHelper.sendReportToGroup(sock, finalSession);
+                            await sock.sendMessage(senderJid, { text: "Report submitted successfully. Have a safe trip! 🚗" });
+                        }
                     } catch (err) {
-                        console.error("Failed to save report:", err);
+                        console.error("Failed to save/update report:", err);
                         await sock.sendMessage(senderJid, { text: "An error occurred while saving your report. Please contact an administrator." });
                     }
                     
@@ -252,7 +278,8 @@ async function connectToWhatsApp() {
 async function askNextChecklistItem(sock, jid, session) {
     if (session.checklistIndex < checklistItems.length) {
         const item = checklistItems[session.checklistIndex];
-        const msg = `${item} in good condition? Reply *Y* for yes or *N* for no, or *cancel* to end the session.`;
+        const prefix = session.isEditing ? "(Editing) " : "";
+        const msg = `${prefix}${item} in good condition? Reply *Y* for yes or *N* for no, or *cancel* to end the session.`;
         await sock.sendMessage(jid, { text: msg });
     } else {
         // Checklist complete

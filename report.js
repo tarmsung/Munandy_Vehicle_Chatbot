@@ -12,8 +12,11 @@ function buildReportHTML(sessionData) {
         vehicleModel,
         vehicleReg,
         checklistResults,
-        comments
+        comments,
+        isEdited
     } = sessionData;
+
+    const editBanner = isEdited ? `<div class="edit-banner">⚠️ CORRECTED REPORT</div>` : '';
 
     const dateStr = new Date().toLocaleString('en-US', { timeZoneName: 'short' });
     
@@ -61,6 +64,17 @@ function buildReportHTML(sessionData) {
           .header h1 {
             margin: 0;
             color: #0056b3;
+          }
+          .edit-banner {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 1.1em;
           }
           .info-grid {
             display: grid;
@@ -127,6 +141,7 @@ function buildReportHTML(sessionData) {
       </head>
       <body>
         <div class="container">
+          ${editBanner}
           <div class="header">
             <h1>Vehicle Inspection Report</h1>
           </div>
