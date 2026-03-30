@@ -202,19 +202,84 @@ async function handleRouteMessage(sock, senderJid, text, session) {
                     name:        routeMap.get(id).name,
                     distance_km: routeMap.get(id).distance_km ?? null
                 }));
-                
-                // Save temporarily and ask for distance
+
                 session.tempRoutes = resolvedRoutes;
-                session.currentStep = 'ROUTE_AWAIT_DISTANCE';
-                sessionManager.updateSession(senderJid, session);
-                
-                await sock.sendMessage(senderJid, { text: `Please enter the total distance covered by this vehicle in km (e.g. 150):` });
+
+                // Check if ALL selected routes have a seeded distance
+                const allHaveDistance = resolvedRoutes.every(r => r.distance_km != null);
+
+                if (allHaveDistance) {
+                    // Sum up the seeded distances
+                    const totalSeeded = resolvedRoutes.reduce((sum, r) => sum + Number(r.distance_km), 0);
+                    session.tempSeededDistance = totalSeeded;
+                    session.currentStep = 'ROUTE_AWAIT_DISTANCE_CONFIRM';
+                    sessionManager.updateSession(senderJid, session);
+
+                    const routeNames = resolvedRoutes.map(r => `${r.name} (${r.distance_km} km)`).join(', ');
+                    await sock.sendMessage(senderJid, {
+                        text: `Route(s) selected: ${routeNames}\n\nTotal distance on record: *${totalSeeded} km*\n\nDo you want to keep this distance or change it?\nReply *keep* or *change*`
+                    });
+                } else {
+                    // One or more routes have no seeded distance — ask manually
+                    session.tempSeededDistance = null;
+                    session.currentStep = 'ROUTE_AWAIT_DISTANCE';
+                    sessionManager.updateSession(senderJid, session);
+                    await sock.sendMessage(senderJid, { text: `Please enter the total distance covered by this vehicle in km (e.g. 150):` });
+                }
             }
             break;
         }
 
         // -------------------------------------------------------
-        // STEP 6: Distance entry
+        // STEP 6: Confirm or override seeded distance
+        // -------------------------------------------------------
+        case 'ROUTE_AWAIT_DISTANCE_CONFIRM': {
+            if (textLower === 'cancel') {
+                await sock.sendMessage(senderJid, { text: 'Session ended.' });
+                sessionManager.clearSession(senderJid);
+                break;
+            }
+
+            if (textLower === 'keep' || textLower === 'k') {
+                // Use the seeded distance as-is
+                const vehicle = session.vehicles[session.currentVehicleIndex];
+                session.vehicleRoutes.push({
+                    registration:         vehicle.registration,
+                    nickname:             vehicle.nickname,
+                    make:                 vehicle.make,
+                    branch:               vehicle.branch,
+                    routes:               session.tempRoutes,
+                    reported_distance_km: session.tempSeededDistance
+                });
+                console.log(`Vehicle ${vehicle.registration}: routes ${session.tempRoutes.map(r => r.name).join(', ')}, distance kept at ${session.tempSeededDistance} km`);
+
+                session.tempRoutes        = null;
+                session.tempSeededDistance = null;
+                session.currentVehicleIndex++;
+                sessionManager.updateSession(senderJid, session);
+
+                if (session.currentVehicleIndex < session.vehicles.length) {
+                    await askCurrentVehicle(sock, senderJid, session);
+                } else {
+                    await finalizeRouteReport(sock, senderJid, session);
+                }
+            } else if (textLower === 'change' || textLower === 'c') {
+                // Driver wants to enter a new distance
+                session.currentStep = 'ROUTE_AWAIT_DISTANCE';
+                sessionManager.updateSession(senderJid, session);
+                await sock.sendMessage(senderJid, {
+                    text: `Enter the new total distance for this vehicle in km (e.g. 150):`
+                });
+            } else {
+                await sock.sendMessage(senderJid, {
+                    text: `Please reply *keep* to use the stored distance or *change* to enter a new one.`
+                });
+            }
+            break;
+        }
+
+        // -------------------------------------------------------
+        // STEP 7: Manual distance entry (no seeded distance, or driver chose to change)
         // -------------------------------------------------------
         case 'ROUTE_AWAIT_DISTANCE': {
             if (textLower === 'cancel') {
@@ -275,9 +340,10 @@ async function sendBriefing(sock, jid) {
     const instructions =
         `Instructions\n` +
         `1. You will be asked for the routes each active vehicle took today\n\n` +
-        `2. First, enter the route ID(s) (comma separated e.g. 3,7,10)\n\n` +
-        `3. Next, you will be asked to enter the total distance covered in km\n\n` +
-        `4. If a vehicle did not do any route, reply with 0\n\n` +
+        `2. Enter the route ID(s) (comma separated e.g. 3,7,10)\n\n` +
+        `3. If a stored distance exists for those routes, you will be asked to *keep* or *change* it\n\n` +
+        `4. If no stored distance is found, you will be asked to enter the total km manually\n\n` +
+        `5. If a vehicle did not do any route, reply with *0*\n\n` +
         `Reply *yes* to continue or *cancel* to cancel the session.`;
     await sock.sendMessage(jid, { text: instructions });
 }
