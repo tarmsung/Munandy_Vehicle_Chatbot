@@ -4,45 +4,53 @@ const sessions = new Map();
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 
 /**
- * Valid session steps:
- * - AWAITING_DRIVER_ID
- * - AWAITING_VEHICLE_REG
- * - CONFIRM_DETAILS
- * - CHECKLIST
- * - AWAITING_COMMENTS
- */
-
-/**
  * Get an existing session or initialize a new default one.
  */
 function getSession(jid) {
     if (!sessions.has(jid)) {
         sessions.set(jid, {
-            currentStep: 'AWAITING_DRIVER_ID',
-            
-            // Collected Data
-            driverID: null,
-            driverName: null,
-            branch: null,
-            
-            vehicleReg: null,
-            vehicleMake: null,
-            vehicleModel: null,
-            
-            // Checklist State
-            checklistIndex: 0,
-            checklistResults: [], // Array of { item: string, status: 'OK'|'FAULT', fault_description: string|null }
-            awaitingFaultDescription: false,
-            currentFaultItem: null,
-            
-            comments: null,
-            
-            // Cleanup timer reference
+            flow: null,
+            currentStep: 'IDLE',
             timeoutRef: null
         });
         resetTimeout(jid);
     }
     return sessions.get(jid);
+}
+
+/**
+ * Initialise a brand-new van session for a JID.
+ * Clears any previous session first.
+ */
+function initVanSession(jid) {
+    clearSession(jid);
+    const session = {
+        flow: 'van',
+        currentStep: 'VAN_AWAIT_DRIVER_ID',
+        
+        // Collected Data
+        driverID: null,
+        driverName: null,
+        branch: null,
+        
+        vehicleReg: null,
+        vehicleMake: null,
+        vehicleModel: null,
+        
+        // Checklist State
+        checklistIndex: 0,
+        checklistResults: [], // Array of { item: string, status: 'OK'|'FAULT', fault_description: string|null }
+        awaitingFaultDescription: false,
+        currentFaultItem: null,
+        
+        comments: null,
+        
+        // Cleanup timer reference
+        timeoutRef: null
+    };
+    sessions.set(jid, session);
+    resetTimeout(jid);
+    return session;
 }
 
 /**
@@ -115,5 +123,6 @@ module.exports = {
     getSession,
     updateSession,
     clearSession,
-    initRouteSession
+    initRouteSession,
+    initVanSession
 };
