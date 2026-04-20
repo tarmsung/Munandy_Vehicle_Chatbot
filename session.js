@@ -26,9 +26,14 @@ function initVanSession(jid) {
     clearSession(jid);
     const session = {
         flow: 'van',
-        currentStep: 'VAN_AWAIT_DRIVER_ID',
+        currentStep: 'VAN_AWAIT_INSPECTOR_ID',
         
-        // Collected Data
+        // Inspector (submits the form)
+        inspectorID: null,
+        inspectorName: null,
+        inspectorBranch: null,
+
+        // Driver (entered at the end)
         driverID: null,
         driverName: null,
         branch: null,

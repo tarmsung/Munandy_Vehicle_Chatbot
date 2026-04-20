@@ -54,15 +54,38 @@ async function lookupDriverAndVehicle(driverId, vehicleReg) {
 }
 
 /**
+ * Look up a single vehicle by registration.
+ */
+async function lookupVehicle(vehicleReg) {
+    try {
+        const { data: vehicle, error } = await supabase
+            .from('vehicles')
+            .select('registration, make, model')
+            .eq('registration', vehicleReg)
+            .single();
+
+        if (error || !vehicle) {
+            console.log(`Vehicle not found: [${vehicleReg}]`);
+            return null;
+        }
+        return vehicle;
+    } catch (err) {
+        console.error('Error in lookupVehicle:', err);
+        throw err;
+    }
+}
+
+/**
  * Save the completed inspection report to the inspection_reports table.
  * Returns the new record's id.
  */
-async function saveInspectionReport({ driverId, vehicleReg, checklist, comments, reporterJid }) {
+async function saveInspectionReport({ driverId, inspectorId, vehicleReg, checklist, comments, reporterJid }) {
     try {
         const { data, error } = await supabase
             .from('inspection_reports')
             .insert([{
                 driver_id:            driverId,
+                inspector_id:         inspectorId || null,
                 vehicle_registration: vehicleReg,
                 submitted_at:         new Date().toISOString(),
                 checklist:            checklist,  // stored as JSONB
@@ -262,6 +285,7 @@ async function updateReport(id, type, updateData) {
 module.exports = {
     supabase,
     lookupDriverAndVehicle,
+    lookupVehicle,
     saveInspectionReport,
     // Route flow helpers
     getRouteReporter,

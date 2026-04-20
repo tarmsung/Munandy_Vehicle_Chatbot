@@ -8,6 +8,8 @@ function buildReportHTML(sessionData) {
     const {
         driverName,
         branch,
+        inspectorName,
+        inspectorBranch,
         vehicleMake,
         vehicleModel,
         vehicleReg,
@@ -148,15 +150,19 @@ function buildReportHTML(sessionData) {
           
           <div class="info-grid">
             <div class="info-box">
-              <div class="info-label">Driver</div>
-              <div class="info-value">${driverName} (${branch})</div>
+              <div class="info-label">Inspector</div>
+              <div class="info-value">${inspectorName || 'N/A'} (${inspectorBranch || 'N/A'})</div>
             </div>
             <div class="info-box">
               <div class="info-label">Vehicle</div>
               <div class="info-value">${vehicleMake} ${vehicleModel} (${vehicleReg})</div>
             </div>
             <div class="info-box">
-              <div class="info-label">Date & Time</div>
+              <div class="info-label">Driver</div>
+              <div class="info-value">${driverName} (${branch})</div>
+            </div>
+            <div class="info-box">
+              <div class="info-label">Date &amp; Time</div>
               <div class="info-value">${dateStr}</div>
             </div>
           </div>
@@ -212,7 +218,7 @@ async function sendReportToGroup(sock, sessionData) {
         console.log('Sending report image to group...');
         await sock.sendMessage(notifyJid, { 
             image: imageBuffer,
-            caption: `Vehicle Inspection Report for ${sessionData.vehicleReg} by ${sessionData.driverName}`
+            caption: `Vehicle Inspection Report for ${sessionData.vehicleReg} | Driver: ${sessionData.driverName} | Inspector: ${sessionData.inspectorName || 'N/A'}`
         });
         console.log('Report image successfully sent to group.');
     } catch (err) {

@@ -120,7 +120,7 @@ async function connectToWhatsApp() {
                 if (textLower === 'van') {
                     // Start Van inspection flow
                     sessionManager.initVanSession(senderJid);
-                    await sock.sendMessage(senderJid, { text: "Welcome to the Vehicle Check System. Please enter your Driver ID." });
+                    await sock.sendMessage(senderJid, { text: "Welcome to the Vehicle Inspection System. You are the Inspector — please enter your ID." });
                 } else if (textLower === 'route') {
                     // Start Route reporting flow — permission check first
                     const phoneNumber = extractPhoneNumber(senderJid);
